@@ -1,3 +1,5 @@
+asyncpraw
 black
+bs4
 praw
 pydantic
