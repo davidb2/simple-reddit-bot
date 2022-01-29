@@ -1,0 +1,15 @@
+{
+  "typeCheckingMode": "strict",
+  "reportUnknownParameterType": "warning",
+  "reportUnknownArgumentType": "warning",
+  "reportUnknownLambdaType": "warning",
+  "reportUnknownMemberType": "warning",
+  "reportUnknownVariableType": "warning",
+  "reportPrivateUsage": "warning",
+  "reportUnusedImport": "warning",
+  "reportUnusedCallResult": "warning",
+  "reportUnusedCoroutine": "warning",
+  "reportUnusedFunction": "warning",
+  "reportUnusedClass": "warning",
+  "reportMissingTypeStubs": "none"
+}
