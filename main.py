@@ -18,17 +18,21 @@ class RedditBotConfig(BaseSettings):
     env_file = '.env'
     env_file_encoding = 'utf-8'
 
-async def main() -> None:
-  config = RedditBotConfig()
-  print(config.user_agent)
-  reddit = praw.Reddit(
+
+def get_reddit(config: RedditBotConfig) -> praw.Reddit:
+  return praw.Reddit(
     client_id=config.client_id,
     client_secret=config.client_secret.get_secret_value(),
     user_agent=config.user_agent,
     username=config.username,
     password=config.password.get_secret_value(),
   )
+
+async def main() -> None:
+  config = RedditBotConfig()
+  reddit = get_reddit(config)
   print(reddit)
+
 
 if __name__ == '__main__':
   loop = asyncio.get_event_loop()
