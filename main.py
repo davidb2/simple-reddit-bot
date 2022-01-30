@@ -11,16 +11,16 @@ import pathlib
 import re
 import yaml
 
+from functools import cached_property
 from pydantic import BaseModel, BaseSettings, SecretStr
 from typing import Optional, Pattern
-
-from functools import cached_property
 
 
 logger = logging.getLogger(__name__)
 FORMAT = "%(asctime)s :: [%(levelname)-8s] :: %(message)s"
 logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.INFO)
+
 
 class RedditBotParams(BaseModel):
   dry_run: bool = False
