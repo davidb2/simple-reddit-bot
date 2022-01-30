@@ -124,28 +124,34 @@ class RedditBot:
   async def _reply_in_the_future(self, comment: asyncpraw.reddit.Comment) -> None:
     await self._queued_comments.put(comment)
 
-  async def _start_replying(self) -> None:
+  async def _start_replying(self, subreddit: asyncpraw.reddit.Subreddit) -> None:
+    """The subreddit needs to already be loaded."""
+    logger.info(f"Starting to listen to {subreddit.display_name} for {self.compiled_pattern}...")
+
     while True:
-      comment = await self._queued_comments.get()
+      try:
+        comment = await self._queued_comments.get()
 
-      # How long since the last reply we made?
-      time_elapsed_since_last_reply = dt.datetime.now() - self._last_reply_time
-      if time_elapsed_since_last_reply < self._config.params.timeout:
-        wait_time = self._config.params.timeout - time_elapsed_since_last_reply
-        wait_time_in_seconds = math.ceil(wait_time.total_seconds())
-        logger.info(f"Replier sleeping for {wait_time}")
-        _ = await asyncio.sleep(wait_time_in_seconds)
+        # How long since the last reply we made?
+        time_elapsed_since_last_reply = dt.datetime.now() - self._last_reply_time
+        if time_elapsed_since_last_reply < self._config.params.timeout:
+          wait_time = self._config.params.timeout - time_elapsed_since_last_reply
+          wait_time_in_seconds = math.ceil(wait_time.total_seconds())
+          logger.info(f"Replier sleeping for {wait_time}")
+          _ = await asyncio.sleep(wait_time_in_seconds)
 
-      async with self._reply_lock:
-        # Double check that it is okay to reply since time could have passed.
-        if not await self._should_reply(comment):
-          logger.info(f"double check failed for {comment.id=}")
-          continue
-          
-        _ = asyncio.create_task(self._log_reply(comment))
-        if not self._config.params.dry_run:
-          _ = await comment.reply(body=self._config.params.reply)
-        self._last_reply_time = dt.datetime.now()
+        async with self._reply_lock:
+          # Double check that it is okay to reply since time could have passed.
+          if not await self._should_reply(comment):
+            logger.info(f"double check failed for {comment.id=}")
+            continue
+
+          _ = asyncio.create_task(self._log_reply(comment))
+          if not self._config.params.dry_run:
+            _ = await comment.reply(body=self._config.params.reply)
+          self._last_reply_time = dt.datetime.now()
+      except Exception as e:
+        logger.error(f"Replier got error: {e}")
   
   @classmethod
   async def format_comment(cls, comment: asyncpraw.reddit.Comment) -> str:
@@ -168,8 +174,8 @@ class RedditBot:
   async def _log_reply(cls, comment: asyncpraw.reddit.Comment) -> None:
     logger.info(f"Replying to {await cls.format_comment(comment)}")
 
-  async def _get_subreddit(self) -> asyncpraw.reddit.Submission:
-    subreddit: asyncpraw.reddit.Submission
+  async def _get_subreddit(self) -> asyncpraw.reddit.Subreddit:
+    subreddit: asyncpraw.reddit.Subreddit
 
     subreddit_name , _, user_subreddit_name = self._config.params.subreddit.lower().partition('u/')
     if user_subreddit_name:
@@ -183,8 +189,8 @@ class RedditBot:
 
   async def stream(self) -> None:
     """Starts streaming."""
-    _ = asyncio.create_task(self._start_replying())
     subreddit = await self._get_subreddit()
+    _ = asyncio.create_task(self._start_replying(subreddit))
     async for raw_comment in subreddit.stream.comments():
       comment: asyncpraw.reddit.Comment = raw_comment
       _ = asyncio.create_task(self._log_comment(comment))
