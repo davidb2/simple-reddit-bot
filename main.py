@@ -20,7 +20,7 @@ from functools import cached_property
 logger = logging.getLogger(__name__)
 FORMAT = "%(asctime)s :: [%(levelname)-8s] :: %(message)s"
 logging.basicConfig(format=FORMAT)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 class RedditBotParams(BaseModel):
   dry_run: bool = False
@@ -92,26 +92,31 @@ class RedditBot:
     text = bs4.BeautifulSoup(comment.body_html, features="lxml").get_text()
 
     # Ignore comments that don't match the pattern.
-    if not self.compiled_pattern.match(text):
+    if not self.compiled_pattern.search(text):
+      logger.debug(f"Skipping reply to {comment.id=} since {text=} does not match pattern {self.compiled_pattern}")
       return False
 
     me: Optional[asyncpraw.reddit.Redditor] = await self._reddit.user.me()
     if not me:
-      # TODO: log something here.
+      logger.critical(f"Skipping reply to {comment.id=} since I could not fetch myself")
       return False
 
     # Don't respond to myself.
     if comment.author == me:
+      logger.info(f"Skipping reply to {comment.id=} since I am the comment author")
       return False
 
     # TODO: optimize this.
     # Don't respond to a submission more than once.
-    async for my_comment in me.comments.new():
+    async for raw_my_comment in me.comments.new():
+      my_comment: asyncpraw.reddit.Comment = raw_my_comment
       # We couldn't have commented before the target submission was created!
       if my_comment.created_utc < comment.created_utc:
         break
 
-      if my_comment.parent().id == comment.id:
+      parent: asyncpraw.reddit.Comment = await my_comment.parent()
+      if parent.id == comment.id:
+        logger.info(f"Skipping reply to {comment.id=} since we already responded ({my_comment.id=})")
         return False
 
     return True
@@ -131,9 +136,10 @@ class RedditBot:
         logger.info(f"Replier sleeping for {wait_time}")
         _ = await asyncio.sleep(wait_time_in_seconds)
 
-      with self._reply_lock:
+      async with self._reply_lock:
         # Double check that it is okay to reply since time could have passed.
         if not await self._should_reply(comment):
+          logger.info(f"double check failed for {comment.id=}")
           continue
           
         _ = asyncio.create_task(self._log_reply(comment))
@@ -183,7 +189,7 @@ class RedditBot:
       comment: asyncpraw.reddit.Comment = raw_comment
       _ = asyncio.create_task(self._log_comment(comment))
       if await self._should_reply(comment):
-        await self._reply_in_the_future(comment)
+        _ = asyncio.create_task(self._reply_in_the_future(comment))
     
 
 async def main(args: argparse.Namespace) -> None:
