@@ -192,10 +192,13 @@ class RedditBot:
     subreddit = await self._get_subreddit()
     _ = asyncio.create_task(self._start_replying(subreddit))
     async for raw_comment in subreddit.stream.comments():
-      comment: asyncpraw.reddit.Comment = raw_comment
-      _ = asyncio.create_task(self._log_comment(comment))
-      if await self._should_reply(comment):
-        _ = asyncio.create_task(self._reply_in_the_future(comment))
+      try:
+        comment: asyncpraw.reddit.Comment = raw_comment
+        _ = asyncio.create_task(self._log_comment(comment))
+        if await self._should_reply(comment):
+          _ = asyncio.create_task(self._reply_in_the_future(comment))
+      except Exception as e:
+        logger.error(f"Streamer got error: {e}")
     
 
 async def main(args: argparse.Namespace) -> None:
