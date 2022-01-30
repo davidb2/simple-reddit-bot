@@ -3,3 +3,4 @@ black
 bs4
 praw
 pydantic
+pyyaml
